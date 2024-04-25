@@ -50,12 +50,12 @@ def black_and_white(image_path, output_path):
 
 
 # Expand bounding boxes
-def expand_bounding_box(box, expand_pixels):
+def expand_bounding_box(box, expand_pixels, image_width, image_height):
     x1, y1, x2, y2 = box
-    x1 -= expand_pixels
-    y1 -= expand_pixels
-    x2 += expand_pixels
-    y2 += expand_pixels
+    x1 = max(0, x1 - expand_pixels)
+    y1 = max(0, y1 - expand_pixels)
+    x2 = min(image_width, x2 + expand_pixels)
+    y2 = min(image_height, y2 + expand_pixels)
     return x1, y1, x2, y2
 
 
@@ -71,7 +71,8 @@ def create_bounding_boxes(black_and_white, original, output_path):
         area = cv2.contourArea(contour)
         if area >= MIN_AREA_THRESHOLD:
             x, y, w, h = cv2.boundingRect(contour)
-            bounding_boxes.append(expand_bounding_box((x, y, x + w, y + h), EXPANDED_PIXELS))
+            bounding_box = expand_bounding_box((x, y, x + w, y + h), EXPANDED_PIXELS, image.shape[1], image.shape[0])
+            bounding_boxes.append(bounding_box)
 
     original = cv2.imread(original)
     for i, box in enumerate(bounding_boxes):
