@@ -82,10 +82,11 @@ def create_bounding_boxes(black_and_white, original, output_path):
 
 # Extract images from input file and store cropped images in output dir
 def extract_images_pipeline(input_file, output_directory):
-    black_and_white_path = 'black_and_white.png'
-    black_and_white(input_file, black_and_white_path)
-    create_bounding_boxes(black_and_white_path, input_file, output_directory)
+    image = cv2.imread(input_file)
+    black_and_white_path = os.path.join(output_directory, 'black_and_white.png')
+    black_and_white(image, black_and_white_path)
     os.remove(black_and_white_path)
+    create_bounding_boxes(image, image, output_directory)
 
 
 # Recognize image using brickognize
