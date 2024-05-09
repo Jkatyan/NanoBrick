@@ -5,9 +5,13 @@ import argparse
 import requests
 from flask import Flask, request, jsonify
 import tempfile
+from ultralytics import YOLO
 
 # Initialize flask app
 app = Flask(__name__)
+
+# Initialize YOLO model
+model = YOLO('./weights/best.pt')
 
 # Constants
 EXPANDED_PIXELS = 50
@@ -78,7 +82,17 @@ def create_bounding_boxes(black_and_white, original, output_path):
     for i, box in enumerate(bounding_boxes):
         x1, y1, x2, y2 = box
         cropped_image = original[y1:y2, x1:x2]
-        cv2.imwrite(os.path.join(output_path, f'cropped_{i}.jpg'), cropped_image)
+
+        # Apply padding
+        height, width, _ = cropped_image.shape
+        new_height = height * 2
+        new_width = width * 2
+        padded_image = np.ones((new_height, new_width, 3), dtype=np.uint8) * 255
+        x_offset = (new_width - width) // 2
+        y_offset = (new_height - height) // 2
+        padded_image[y_offset:y_offset+height, x_offset:x_offset+width] = cropped_image
+
+        cv2.imwrite(os.path.join(output_path, f'cropped_{i}.jpg'), padded_image)
 
 
 # Extract images from input file and store cropped images in output dir
