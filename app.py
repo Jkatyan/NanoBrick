@@ -166,8 +166,3 @@ def predict():
 @app.route('/')
 def home():
     return 'NanoBrick is running! Use the /predict endpoint to perform brick predictions.'
-
-
-# Run flask app
-if __name__ == '__main__':
-    app.run(debug=True)
