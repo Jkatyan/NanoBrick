@@ -11,15 +11,18 @@ import requests
 import tempfile
 from PIL import Image
 from flask import Flask, request, jsonify
-from roboflow import Roboflow
+from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Initialize Roboflow model
-rf = Roboflow(api_key=os.environ.get('RF_API_KEY'))
-project = rf.workspace().project("nanobrick")
-model = project.version(1).model
+# Initialize inference client
+custom_configuration = InferenceConfiguration(confidence_threshold=0)
+CLIENT = InferenceHTTPClient(
+    api_url="https://detect.roboflow.com",
+    api_key=os.environ.get('RF_API_KEY')
+)
+CLIENT.configure(custom_configuration)
 
 # Constants
 EXPANDED_PIXELS = 0
@@ -163,7 +166,7 @@ def predict():
                 image = Image.open(image_path)
 
                 # Predict boxes
-                result = model.predict(image_path, confidence=0, overlap=30).json()
+                result = CLIENT.infer(image_path, model_id="nanobrick/1")
                 predictions = result['predictions']
 
                 # More than one detected brick, perform segmentation with hosted model
