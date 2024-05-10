@@ -1,3 +1,8 @@
+"""
+Flask back-end for NanoBrick
+CS 4704, Spring 2024
+"""
+
 import os
 import cv2
 import numpy as np
@@ -6,6 +11,7 @@ import requests
 from flask import Flask, request, jsonify
 import tempfile
 from ultralytics import YOLO
+from PIL import Image
 
 # Initialize flask app
 app = Flask(__name__)
@@ -17,6 +23,9 @@ model = YOLO('./weights/best.pt')
 EXPANDED_PIXELS = 50
 MIN_AREA_THRESHOLD = 10000
 
+"""
+Image processing helper functions
+"""
 
 # Sobel edge detection
 def sobel_edge_detection(image, threshold=100):
@@ -94,6 +103,9 @@ def create_bounding_boxes(black_and_white, original, output_path):
 
         cv2.imwrite(os.path.join(output_path, f'cropped_{i}.jpg'), padded_image)
 
+"""
+Pipeline helper functions
+"""
 
 # Extract images from input file and store cropped images in output dir
 def extract_images_pipeline(input_file, output_directory):
@@ -125,6 +137,9 @@ def parse_arguments():
     parser.add_argument("output_file", type=str, help="Path to the output file")
     return parser.parse_args()
 
+"""
+Flask app endpoint
+"""
 
 # Predict endpoint
 @app.route('/predict', methods=['POST'])
@@ -143,18 +158,54 @@ def predict():
             for file in files:
                 # Get image information
                 image_path = os.path.abspath(os.path.join(root, file))
+                image = Image.open(image_path)
 
-                # Query brickognize
-                try: 
-                    label, name, img = recognize(image_path)
-                    if label in bricks:
-                        bricks[label]["count"] += 1
-                    else:
-                        bricks[label] = {"count": 1, "name": name, "image_url": img}
+                # Predict boxes
+                result = model.predict(image_path)[0]
 
-                # Skip images with no result   
-                except:
-                    continue
+                # More than one detected brick, perform segmentation with local model
+                if len(result.boxes) > 1:
+                    # Create temporary directory to store cropped images
+                    with tempfile.TemporaryDirectory() as cropped_output_dir:
+                        i = 0
+                        for box in result.boxes:
+                            # Get bounding box coordinates
+                            cords = box.xyxy[0].tolist()
+                            cords = [round(x) for x in cords]
+
+                            # Crop image
+                            cropped_image = image.crop(cords)
+                            cropped_image = cropped_image.convert('RGB')
+                            cropped_image.save(os.path.join(cropped_output_dir, f'cropped_{i}.jpg'))
+                            i += 1
+                        
+                        # Query brickognize
+                        for cropped_root, _, cropped_files in os.walk(cropped_output_dir):
+                            for cropped_file in cropped_files:
+                                try: 
+                                    cropped_image_path = os.path.abspath(os.path.join(cropped_root, cropped_file))
+                                    label, name, img = recognize(cropped_image_path)
+                                    if label in bricks:
+                                        bricks[label]["count"] += 1
+                                    else:
+                                        bricks[label] = {"count": 1, "name": name, "image_url": img}
+
+                                # Skip images with no result   
+                                except:
+                                    continue
+                
+                # One or less detected bricks, query brickognize directly
+                else:
+                    try: 
+                        label, name, img = recognize(image_path)
+                        if label in bricks:
+                            bricks[label]["count"] += 1
+                        else:
+                            bricks[label] = {"count": 1, "name": name, "image_url": img}
+
+                    # Skip images with no result   
+                    except:
+                        continue
 
     # Convert bricks dictionary to JSON format
     json_data = [{"label": label, "name": data["name"], "count": data["count"], "image_url": data["image_url"]} for label, data in bricks.items()]
