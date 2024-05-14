@@ -120,21 +120,24 @@ def predict():
                         cropped_image_path = os.path.abspath(os.path.join(cropped_root, cropped_file))
                         items = recognize(cropped_image_path)
 
-                        # Iterate through possible legos
+                        # Take most likely prediction
+                        label = items[0]["id"]
+                        name = items[0]["name"]
+                        img = items[0]["img_url"]
+
+                        # Verify that this (or a similar piece) is in our classes list
+                        valid = False
                         for item in items:
                             label = item["id"]
-                            name = item["name"]
-                            img = item["img_url"]
-
-                            # Filter out misidentified classes
                             if label in classes:
-                                if label in bricks:
-                                    bricks[label]["count"] += 1
-                                else:
-                                    bricks[label] = {"count": 1, "name": name, "image_url": img}
-
-                                # Exit loop
+                                valid = True
                                 break
+                        
+                        if valid:
+                            if label in bricks:
+                                bricks[label]["count"] += 1
+                            else:
+                                bricks[label] = {"count": 1, "name": name, "image_url": img}
 
                     # Skip images with no result   
                     except:
