@@ -63,8 +63,39 @@ def bounding_box(prediction):
 
 # Remove overlaps in predictions
 def remove_overlaps(predictions):
-    # TODO remove overlaps
-    return predictions
+    remaining_predictions = []
+    for pred in predictions:
+        overlaps = False
+        for other_pred in remaining_predictions:
+            if overlap(pred['coordinates'], other_pred['coordinates']):
+                intersection_area = calculate_intersection_area(pred['coordinates'], other_pred['coordinates'])
+                pred_area = calculate_area(pred['coordinates'])
+                other_pred_area = calculate_area(other_pred['coordinates'])
+                # Calculate the intersection over union (IOU)
+                iou = intersection_area / (pred_area + other_pred_area - intersection_area)
+                # If IOU is less than 0.9, it's considered overlapping, so we discard the prediction
+                if iou >= 0.7:
+                    overlaps = True
+                    break
+        if not overlaps:
+            remaining_predictions.append(pred)
+    return remaining_predictions
+
+def overlap(box1, box2):
+    x1, y1, w1, h1 = box1
+    x2, y2, w2, h2 = box2
+    return not (x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
+
+def calculate_intersection_area(box1, box2):
+    x1, y1, w1, h1 = box1
+    x2, y2, w2, h2 = box2
+    x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
+    y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
+    return x_overlap * y_overlap
+
+def calculate_area(box):
+    x, y, w, h = box
+    return w * h
     
 """
 Flask app endpoint
@@ -125,19 +156,11 @@ def predict():
                         name = items[0]["name"]
                         img = items[0]["img_url"]
 
-                        # Verify that this (or a similar piece) is in our classes list
-                        valid = False
-                        for item in items:
-                            new_label = item["id"]
-                            if new_label in classes:
-                                valid = True
-                                break
                         
-                        if valid:
-                            if label in bricks:
-                                bricks[label]["count"] += 1
-                            else:
-                                bricks[label] = {"count": 1, "name": name, "image_url": img}
+                        if label in bricks:
+                            bricks[label]["count"] += 1
+                        else:
+                            bricks[label] = {"count": 1, "name": name, "image_url": img}
 
                     # Skip images with no result   
                     except:
