@@ -128,8 +128,8 @@ def predict():
                         # Verify that this (or a similar piece) is in our classes list
                         valid = False
                         for item in items:
-                            label = item["id"]
-                            if label in classes:
+                            new_label = item["id"]
+                            if new_label in classes:
                                 valid = True
                                 break
                         
