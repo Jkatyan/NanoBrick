@@ -155,8 +155,11 @@ def predict():
                         label = items[0]["id"]
                         name = items[0]["name"]
                         img = items[0]["img_url"]
-
                         
+                        if label not in classes:
+                            name = "Unknown Brick"
+                            img = "https://storage.googleapis.com/brickognize-static/thumbnails-v2.4/part/3004pb246/0.webp"
+                            
                         if label in bricks:
                             bricks[label]["count"] += 1
                         else:
