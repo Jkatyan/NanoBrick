@@ -4,9 +4,11 @@ CS 4704, Spring 2024
 """
 
 import os
+import json
 import requests
 import tempfile
-from PIL import Image, ImageDraw
+import base64
+from PIL import Image
 from flask import Flask, request, jsonify
 from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 
@@ -14,7 +16,11 @@ from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 Globals
 """
 
+# Object overlap threshold
 OVERLAP_THRESHOLD = 0.9
+
+# Stage 2 processing endpoint
+processing_endpoint = "https://nanobrick-stage2.vercel.app/process"
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -80,11 +86,13 @@ def remove_overlaps(predictions):
             remaining_predictions.append(pred)
     return remaining_predictions
 
+# Calculate overlap
 def overlap(box1, box2):
     x1, y1, w1, h1 = box1
     x2, y2, w2, h2 = box2
     return not (x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
 
+# Calculate intersection area
 def calculate_intersection_area(box1, box2):
     x1, y1, w1, h1 = box1
     x2, y2, w2, h2 = box2
@@ -92,8 +100,9 @@ def calculate_intersection_area(box1, box2):
     y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
     return x_overlap * y_overlap
 
+# Calculate box area
 def calculate_area(box):
-    x, y, w, h = box
+    _, _, w, h = box
     return w * h
 
 # Function to pad image with a border of given color
@@ -159,58 +168,39 @@ def predict():
             """
             Stage 2: Calculate average color, censor iteration 1 results, use custom model, remove overlaps
             """
-
-            # image_copy = image.copy()
             
-            # # Censor out predicted boxes
-            # draw = ImageDraw.Draw(image_copy)
-            # for prediction in predictions:
-            #     draw.rectangle(prediction['coordinates'], fill=(0, 255, 0))
-            # image_copy = image_copy.convert("RGB")
+            # Prepare data for POST request
+            files = {'image': open(image_path, 'rb')}
+            data = {'predictions': json.dumps(predictions)}
 
-            # # Calculate average background color
-            # width, height = image_copy.size
-            # total_red = 0
-            # total_green = 0
-            # total_blue = 0
-            # num_valid_pixels = 0
+            # Send POST request to the endpoint
+            response = requests.post(processing_endpoint, files=files, data=data)
+
+            # Extract response data
+            response_data = response.json()
             
-            # for y in range(height):
-            #     for x in range(width):
-            #         r, g, b = image_copy.getpixel((x, y))
-            #         # Exclude pure green pixels
-            #         if (r, g, b) != (0, 255, 0):
-            #             total_red += r
-            #             total_green += g
-            #             total_blue += b
-            #             num_valid_pixels += 1
-            
-            # # Fill with average background color
-            # avg_red = total_red / num_valid_pixels
-            # avg_green = total_green / num_valid_pixels
-            # avg_blue = total_blue / num_valid_pixels
+            # Unload image
+            image_stage_2_base64 = response_data.get('image', '')
+            image_stage_2_path = f"{cropped_output_dir}/censored.jpg"
 
-            # avg_color = (int(avg_red), int(avg_green), int(avg_blue))
+            # Decode base64 and save the image
+            image_data = base64.b64decode(image_stage_2_base64)
+            with open(image_stage_2_path, 'wb') as censored_image:
+                censored_image.write(image_data)
 
-            # draw = ImageDraw.Draw(image_copy)
-            # for prediction in predictions:
-            #     draw.rectangle(prediction['coordinates'], fill=avg_color)
-            # image_copy = image_copy.convert("RGB")
+            # Unload predictions
+            predictions = json.loads(response_data['predictions'])
 
-            # # Replace image with correct censor color
-            # image_path = f"{cropped_output_dir}/censored.jpg"
-            # image_copy.save(image_path)
+            # Perform inference with custom model on censored images
+            result_custom = CLIENT.infer(image_stage_2_path, model_id="nanobrick/1")
+            predictions_custom = result_custom['predictions']
 
-            # # Perform inference with custom model on censored images
-            # result_custom = CLIENT.infer(image_path, model_id="nanobrick/1")
-            # predictions_custom = result_custom['predictions']
+            # Iterate over censored predictions and save to dictionary
+            for prediction in predictions_custom:
+                predictions.append(bounding_box(prediction))
 
-            # # Iterate over censored predictions and save to dictionary
-            # for prediction in predictions_custom:
-            #     predictions.append(bounding_box(prediction))
-
-            # # Remove overlaps in predictions
-            # predictions = remove_overlaps(predictions)
+            # Remove overlaps in predictions
+            predictions = remove_overlaps(predictions)
 
             """
             Perform brick recognition
@@ -262,4 +252,4 @@ def home():
 
 # Run app for debug
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
