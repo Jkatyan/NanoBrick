@@ -214,8 +214,7 @@ def predict():
                 cropped_image = cropped_image.convert("RGB")
 
                 # Pad images
-                # padded_image = pad_image(cropped_image, avg_color, 3)
-                padded_image = pad_image(cropped_image, (255, 255, 255), 3)
+                padded_image = pad_image(cropped_image, response_data['avg_color'], 3)
                 padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
             # Query brickognize
