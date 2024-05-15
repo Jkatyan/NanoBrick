@@ -6,13 +6,15 @@ CS 4704, Spring 2024
 import os
 import requests
 import tempfile
-from PIL import Image
+from PIL import Image, ImageDraw
 from flask import Flask, request, jsonify
 from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 
 """
 Globals
 """
+
+OVERLAP_THRESHOLD = 0.9
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -70,8 +72,8 @@ def remove_overlaps(predictions):
                 other_pred_area = calculate_area(other_pred['coordinates'])
                 # Calculate the intersection over union (IOU)
                 iou = intersection_area / (pred_area + other_pred_area - intersection_area)
-                # If IOU is less than 0.9, it's considered overlapping, so we discard the prediction
-                if iou >= 0.7:
+                # If IOU is less than OVERLAP_THRESHOLD, it's considered overlapping, so we discard the prediction
+                if iou >= OVERLAP_THRESHOLD:
                     overlaps = True
                     break
         if not overlaps:
@@ -93,6 +95,21 @@ def calculate_intersection_area(box1, box2):
 def calculate_area(box):
     x, y, w, h = box
     return w * h
+
+# Function to pad image with a border of given color
+def pad_image(image, border_color, padding_factor):
+    old_width, old_height = image.size
+    new_width = old_width * padding_factor
+    new_height = old_height * padding_factor
+    
+    padded_image = Image.new("RGB", (new_width, new_height), border_color)
+
+    x_offset = int((new_width - old_width) / 2)
+    y_offset = int((new_height - old_height) / 2)
+
+    padded_image.paste(image, (x_offset, y_offset))
+    
+    return padded_image
     
 """
 Flask app endpoint
@@ -120,6 +137,10 @@ def predict():
 
         # Create temporary directory to store cropped images
         with tempfile.TemporaryDirectory() as cropped_output_dir:
+
+            """
+            Iteration 1: Combine results from two models, remove overlaps
+            """
     
             # Iterate over predictions and save to dictionary
             predictions = []
@@ -140,6 +161,77 @@ def predict():
                 cropped_image = image.crop(prediction['coordinates'])
                 cropped_image = cropped_image.convert("RGB")
                 cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
+
+            """
+            Iteration 2: Calculate average color, censor iteration 1 results, use custom model, remove overlaps
+            """
+
+            image_copy = image.copy()
+            
+            # Censor out predicted boxes
+            draw = ImageDraw.Draw(image_copy)
+            for prediction in predictions:
+                draw.rectangle(prediction['coordinates'], fill=(0, 255, 0))
+            image_copy = image_copy.convert("RGB")
+
+            # Calculate average background color
+            width, height = image_copy.size
+            total_red = 0
+            total_green = 0
+            total_blue = 0
+            num_valid_pixels = 0
+            
+            for y in range(height):
+                for x in range(width):
+                    r, g, b = image_copy.getpixel((x, y))
+                    # Exclude pure green pixels
+                    if (r, g, b) != (0, 255, 0):
+                        total_red += r
+                        total_green += g
+                        total_blue += b
+                        num_valid_pixels += 1
+            
+            # Fill with average background color
+            avg_red = total_red / num_valid_pixels
+            avg_green = total_green / num_valid_pixels
+            avg_blue = total_blue / num_valid_pixels
+
+            avg_color = (int(avg_red), int(avg_green), int(avg_blue))
+
+            draw = ImageDraw.Draw(image_copy)
+            for prediction in predictions:
+                draw.rectangle(prediction['coordinates'], fill=avg_color)
+            image_copy = image_copy.convert("RGB")
+
+            # Replace image with correct censor color
+            image_path = f"{cropped_output_dir}/censored.jpg"
+            image_copy.save(image_path)
+
+            # Perform inference with custom model on censored images
+            result_custom = CLIENT.infer(image_path, model_id="nanobrick/1")
+            predictions_custom = result_custom['predictions']
+
+            # Iterate over censored predictions and save to dictionary
+            for prediction in predictions_custom:
+                predictions.append(bounding_box(prediction))
+
+            # Remove overlaps in predictions
+            predictions = remove_overlaps(predictions)
+
+            """
+            Perform brick recognition
+            """
+            
+            print("Final count:", len(predictions))
+
+            # Save cropped images
+            for prediction in predictions:
+                cropped_image = image.crop(prediction['coordinates'])
+                cropped_image = cropped_image.convert("RGB")
+
+                # Pad images
+                padded_image = pad_image(cropped_image, avg_color, 3)
+                padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
             # Query brickognize
             for cropped_root, _, cropped_files in os.walk(cropped_output_dir):
