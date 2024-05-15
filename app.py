@@ -139,7 +139,7 @@ def predict():
         with tempfile.TemporaryDirectory() as cropped_output_dir:
 
             """
-            Iteration 1: Combine results from two models, remove overlaps
+            Stage 1: Combine results from two models, remove overlaps
             """
     
             # Iterate over predictions and save to dictionary
@@ -157,60 +157,60 @@ def predict():
             predictions = remove_overlaps(predictions)
 
             """
-            Iteration 2: Calculate average color, censor iteration 1 results, use custom model, remove overlaps
+            Stage 2: Calculate average color, censor iteration 1 results, use custom model, remove overlaps
             """
 
-            image_copy = image.copy()
+            # image_copy = image.copy()
             
-            # Censor out predicted boxes
-            draw = ImageDraw.Draw(image_copy)
-            for prediction in predictions:
-                draw.rectangle(prediction['coordinates'], fill=(0, 255, 0))
-            image_copy = image_copy.convert("RGB")
+            # # Censor out predicted boxes
+            # draw = ImageDraw.Draw(image_copy)
+            # for prediction in predictions:
+            #     draw.rectangle(prediction['coordinates'], fill=(0, 255, 0))
+            # image_copy = image_copy.convert("RGB")
 
-            # Calculate average background color
-            width, height = image_copy.size
-            total_red = 0
-            total_green = 0
-            total_blue = 0
-            num_valid_pixels = 0
+            # # Calculate average background color
+            # width, height = image_copy.size
+            # total_red = 0
+            # total_green = 0
+            # total_blue = 0
+            # num_valid_pixels = 0
             
-            for y in range(height):
-                for x in range(width):
-                    r, g, b = image_copy.getpixel((x, y))
-                    # Exclude pure green pixels
-                    if (r, g, b) != (0, 255, 0):
-                        total_red += r
-                        total_green += g
-                        total_blue += b
-                        num_valid_pixels += 1
+            # for y in range(height):
+            #     for x in range(width):
+            #         r, g, b = image_copy.getpixel((x, y))
+            #         # Exclude pure green pixels
+            #         if (r, g, b) != (0, 255, 0):
+            #             total_red += r
+            #             total_green += g
+            #             total_blue += b
+            #             num_valid_pixels += 1
             
-            # Fill with average background color
-            avg_red = total_red / num_valid_pixels
-            avg_green = total_green / num_valid_pixels
-            avg_blue = total_blue / num_valid_pixels
+            # # Fill with average background color
+            # avg_red = total_red / num_valid_pixels
+            # avg_green = total_green / num_valid_pixels
+            # avg_blue = total_blue / num_valid_pixels
 
-            avg_color = (int(avg_red), int(avg_green), int(avg_blue))
+            # avg_color = (int(avg_red), int(avg_green), int(avg_blue))
 
-            draw = ImageDraw.Draw(image_copy)
-            for prediction in predictions:
-                draw.rectangle(prediction['coordinates'], fill=avg_color)
-            image_copy = image_copy.convert("RGB")
+            # draw = ImageDraw.Draw(image_copy)
+            # for prediction in predictions:
+            #     draw.rectangle(prediction['coordinates'], fill=avg_color)
+            # image_copy = image_copy.convert("RGB")
 
-            # Replace image with correct censor color
-            image_path = f"{cropped_output_dir}/censored.jpg"
-            image_copy.save(image_path)
+            # # Replace image with correct censor color
+            # image_path = f"{cropped_output_dir}/censored.jpg"
+            # image_copy.save(image_path)
 
-            # Perform inference with custom model on censored images
-            result_custom = CLIENT.infer(image_path, model_id="nanobrick/1")
-            predictions_custom = result_custom['predictions']
+            # # Perform inference with custom model on censored images
+            # result_custom = CLIENT.infer(image_path, model_id="nanobrick/1")
+            # predictions_custom = result_custom['predictions']
 
-            # Iterate over censored predictions and save to dictionary
-            for prediction in predictions_custom:
-                predictions.append(bounding_box(prediction))
+            # # Iterate over censored predictions and save to dictionary
+            # for prediction in predictions_custom:
+            #     predictions.append(bounding_box(prediction))
 
-            # Remove overlaps in predictions
-            predictions = remove_overlaps(predictions)
+            # # Remove overlaps in predictions
+            # predictions = remove_overlaps(predictions)
 
             """
             Perform brick recognition
