@@ -156,12 +156,6 @@ def predict():
             # Remove overlaps in predictions
             predictions = remove_overlaps(predictions)
 
-            # Save cropped images
-            for prediction in predictions:
-                cropped_image = image.crop(prediction['coordinates'])
-                cropped_image = cropped_image.convert("RGB")
-                cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
-
             """
             Iteration 2: Calculate average color, censor iteration 1 results, use custom model, remove overlaps
             """
