@@ -16,6 +16,9 @@ from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 Globals
 """
 
+# Classes
+classes = ['10928', '2465', '2780', '32009', '32014', '32034', '32054', '32062', '32072', '32073', '32140', '32184', '32248', '32270', '32271', '32291', '32348', '32449', '32498', '32523', '32526', '32556', '33299', '3647', '3648', '3649', '3673', '3706', '3713', '3737', '3749', '40490', '41239', '41678', '4185c01', '42003', '44809', '4519', '45590', '4716', '48989', '55615', '57585', '60483', '60484', '62462', '63869', '64178', '64179', '6536', '6538c', '6558', '6587', '6589', '6629', '81', '82', '83', '84', '85', '87083', '92911', '94925', '99010', '99773', 'x346']
+
 # Object overlap threshold
 OVERLAP_THRESHOLD = 0.7
 
@@ -226,14 +229,22 @@ def predict():
                         items = recognize(cropped_image_path)
 
                         # Take most likely prediction
-                        label = items[0]["id"]
-                        name = items[0]["name"]
-                        img = items[0]["img_url"]
+                        label = None
+                        name = None
+                        img = None
 
-                        if label in bricks:
-                            bricks[label]["count"] += 1
-                        else:
-                            bricks[label] = {"count": 1, "name": name, "image_url": img}
+                        for item in items:
+                            if item["id"] in classes:
+                                label = item["id"]
+                                name = item["name"]
+                                img = item["img_url"]
+                                break
+
+                        if label is not None:
+                            if label in bricks:
+                                bricks[label]["count"] += 1
+                            else:
+                                bricks[label] = {"count": 1, "name": name, "image_url": img}
 
                     # Skip images with no result   
                     except:
