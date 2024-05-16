@@ -181,7 +181,7 @@ def predict():
             image_copy = image_copy.convert("RGB")
 
             # Define the step size
-            step_size = 50
+            step_size = 100
 
             # Calculate average background color
             width, height = image_copy.size
@@ -259,7 +259,7 @@ def predict():
 
                 # Pad images
                 # padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
-                padded_image = pad_image(cropped_image, avg_color, 2)
+                padded_image = pad_image(cropped_image, avg_color, 3)
                 padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
                 # cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
