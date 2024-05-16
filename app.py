@@ -173,14 +173,14 @@ def predict():
             """
             
             # Prepare data for POST request
-            # files = {'image': open(image_path, 'rb')}
-            # data = {'predictions': json.dumps(predictions)}
+            files = {'image': open(image_path, 'rb')}
+            data = {'predictions': json.dumps(predictions)}
 
-            # # Send POST request to the endpoint
-            # response = requests.post(processing_endpoint, files=files, data=data)
+            # Send POST request to the endpoint
+            response = requests.post(processing_endpoint, files=files, data=data)
 
-            # # Extract response data
-            # response_data = response.json()
+            # Extract response data
+            response_data = response.json()
             
             # # Unload image
             # image_stage_2_base64 = response_data.get('image', '')
@@ -217,10 +217,10 @@ def predict():
                 cropped_image = cropped_image.convert("RGB")
 
                 # Pad images
-                # padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
+                padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
                 # padded_image = pad_image(cropped_image, (255, 255, 255), 3)
-                # padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
-                cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
+                padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
+                # cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
             # Query brickognize
             for cropped_root, _, cropped_files in os.walk(cropped_output_dir):
