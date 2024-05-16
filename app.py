@@ -4,10 +4,10 @@ CS 4704, Spring 2024
 """
 
 import os
-import json
 import requests
 import tempfile
-import base64
+import cv2
+import numpy as np
 from PIL import Image, ImageDraw
 from flask import Flask, request, jsonify
 from inference_sdk import InferenceHTTPClient, InferenceConfiguration
@@ -20,10 +20,10 @@ Globals
 classes = ['10928', '2465', '2780', '32009', '32014', '32034', '32054', '32062', '32072', '32073', '32140', '32184', '32248', '32270', '32271', '32291', '32348', '32449', '32498', '32523', '32526', '32556', '33299', '3647', '3648', '3649', '3673', '3706', '3713', '3737', '3749', '40490', '41239', '41678', '4185c01', '42003', '44809', '4519', '45590', '4716', '48989', '55615', '57585', '60483', '60484', '62462', '63869', '64178', '64179', '6536', '6538c', '6558', '6587', '6589', '6629', '81', '82', '83', '84', '85', '87083', '92911', '94925', '99010', '99773', 'x346']
 
 # Object overlap threshold
-OVERLAP_THRESHOLD = 0.7
+OVERLAP_THRESHOLD = 0.75
 
-# Stage 2 processing endpoint
-processing_endpoint = "https://nanobrick-stage2.vercel.app/process"
+# Black object threshold
+BLACK_THRESHOLD = 0.05
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -122,6 +122,57 @@ def pad_image(image, border_color, padding_factor):
     padded_image.paste(image, (x_offset, y_offset))
     
     return padded_image
+
+# Detect brick color
+def detect_color(image):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    # Define ranges for each color in HSV
+    lower_red = np.array([0, 50, 50])
+    upper_red = np.array([20, 255, 255])
+    
+    lower_green = np.array([30, 30, 30])
+    upper_green = np.array([90, 255, 255])
+    
+    lower_blue = np.array([80, 50, 50])
+    upper_blue = np.array([150, 255, 255])
+    
+    lower_yellow = np.array([10, 50, 50])
+    upper_yellow = np.array([40, 255, 255])
+    
+    # Threshold the HSV image to get only the specified colors
+    mask_red = cv2.inRange(hsv, lower_red, upper_red)
+    mask_green = cv2.inRange(hsv, lower_green, upper_green)
+    mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
+    mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
+    
+    # Apply a mask to filter out low brightness pixels
+    v_channel = hsv[:,:,2]
+    min_brightness = 75
+    mask_red[v_channel < min_brightness] = 0
+    mask_green[v_channel < min_brightness] = 0
+    mask_blue[v_channel < min_brightness] = 0
+    mask_yellow[v_channel < min_brightness] = 0
+    
+    # Count the number of pixels for each color
+    count_red = cv2.countNonZero(mask_red)
+    count_green = cv2.countNonZero(mask_green)
+    count_blue = cv2.countNonZero(mask_blue)
+    count_yellow = cv2.countNonZero(mask_yellow)
+
+    # Calculate total pixels in image
+    img_height, img_width, _ = image.shape
+    count_total = img_height * img_width
+
+    # Determine the dominant color
+    color_counts = {'Red': count_red, 'Green': count_green, 'Blue': count_blue, 'Yellow': count_yellow}
+    dominant_color = max(color_counts, key=color_counts.get)
+
+    # Check if image is black
+    if all(count / count_total < BLACK_THRESHOLD for count in color_counts.values()):
+        dominant_color = None
+    
+    return dominant_color
     
 """
 Flask app endpoint
@@ -180,18 +231,15 @@ def predict():
                 draw.rectangle(prediction['coordinates'], fill=(0, 255, 0))
             image_copy = image_copy.convert("RGB")
 
-            # Define the step size
-            step_size = 200
-
             # Calculate average background color
             width, height = image_copy.size
             total_red = 0
             total_green = 0
             total_blue = 0
             num_valid_pixels = 0
-
-            for y in range(0, height, step_size):
-                for x in range(0, width, step_size):
+            
+            for y in range(height):
+                for x in range(width):
                     r, g, b = image_copy.getpixel((x, y))
                     # Exclude pure green pixels
                     if (r, g, b) != (0, 255, 0):
@@ -199,11 +247,12 @@ def predict():
                         total_green += g
                         total_blue += b
                         num_valid_pixels += 1
-
+            
             # Fill with average background color
             avg_red = total_red / num_valid_pixels
             avg_green = total_green / num_valid_pixels
             avg_blue = total_blue / num_valid_pixels
+
             avg_color = (int(avg_red), int(avg_green), int(avg_blue))
 
             draw = ImageDraw.Draw(image_copy)
@@ -212,28 +261,6 @@ def predict():
             image_copy = image_copy.convert("RGB")
             image_copy_path = f"{cropped_output_dir}/censored.jpg"
             image_copy.save(image_copy_path)
-            
-            # # Prepare data for POST request
-            # files = {'image': open(image_path, 'rb')}
-            # data = {'predictions': json.dumps(predictions)}
-
-            # # Send POST request to the endpoint
-            # response = requests.post(processing_endpoint, files=files, data=data)
-
-            # # Extract response data
-            # response_data = response.json()
-            
-            # # Unload image
-            # image_stage_2_base64 = response_data.get('image', '')
-            # image_stage_2_path = f"{cropped_output_dir}/censored.jpg"
-
-            # # Decode base64 and save the image
-            # image_data = base64.b64decode(image_stage_2_base64)
-            # with open(image_stage_2_path, 'wb') as censored_image:
-            #     censored_image.write(image_data)
-
-            # # Unload predictions
-            # predictions = json.loads(response_data['predictions'])
 
             # # Perform inference with custom model on censored images
             result_custom = CLIENT.infer(image_copy_path, model_id="nanobrick/1")
@@ -249,8 +276,6 @@ def predict():
             """
             Perform brick recognition
             """
-            
-            print("Final count:", len(predictions))
 
             # Save cropped images
             for prediction in predictions:
@@ -258,10 +283,8 @@ def predict():
                 cropped_image = cropped_image.convert("RGB")
 
                 # Pad images
-                # padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
                 padded_image = pad_image(cropped_image, avg_color, 3)
                 padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
-                # cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
             # Query brickognize
             for cropped_root, _, cropped_files in os.walk(cropped_output_dir):
@@ -269,12 +292,11 @@ def predict():
                     try: 
                         cropped_image_path = os.path.abspath(os.path.join(cropped_root, cropped_file))
                         items = recognize(cropped_image_path)
-
-                        # Take most likely prediction
                         label = None
                         name = None
                         img = None
 
+                        # Get most likely item that's within the expected classes
                         for item in items:
                             if item["id"] in classes:
                                 label = item["id"]
@@ -283,6 +305,24 @@ def predict():
                                 break
 
                         if label is not None:
+                            # Color detection if necessary
+                            if label == '32523':
+                                image = cv2.imread(cropped_image_path)
+                                color = detect_color(image)
+                                if color is None:
+                                    label += f" - Black"
+                                else:
+                                    label += f" - {color}"
+
+                            elif label == '43093' or label == '3749':
+                                image = cv2.imread(cropped_image_path)
+                                color = detect_color(image)
+                                if color == 'Yellow':
+                                    label = "3749 - Tan"
+                                else:
+                                    label = "43093 - Blue"
+
+                            # Add to json
                             if label in bricks:
                                 bricks[label]["count"] += 1
                             else:
@@ -296,6 +336,9 @@ def predict():
     # Convert bricks dictionary to JSON format
     json_data = [{"label": label, "name": data["name"], "count": data["count"], "image_url": data["image_url"]} for label, data in bricks.items()]
 
+    # Print final prediction count for debug
+    print("Final count:", len(predictions))
+
     return jsonify(json_data)
 
 # Default endpoint
@@ -305,4 +348,5 @@ def home():
 
 # Run app for debug
 if __name__ == '__main__':
+    # Debug: ./ngrok http --domain=penguin-gorgeous-vaguely.ngrok-free.app 5000
     app.run(debug=True, port=5000)

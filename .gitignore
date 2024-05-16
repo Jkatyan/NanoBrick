@@ -3,6 +3,11 @@
 *.pyc
 __pycache__
 *.DS_Store
+*.png
+*.jpg
+*.jpeg
+*.ipynb
+ngrok
 
 # Environments 
 .env 
