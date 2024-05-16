@@ -218,8 +218,9 @@ def predict():
 
                 # Pad images
                 # padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
-                padded_image = pad_image(cropped_image, (255, 255, 255), 3)
-                padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
+                # padded_image = pad_image(cropped_image, (255, 255, 255), 3)
+                # padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
+                cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
             # Query brickognize
             for cropped_root, _, cropped_files in os.walk(cropped_output_dir):
