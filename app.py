@@ -170,37 +170,37 @@ def predict():
             """
             
             # Prepare data for POST request
-            files = {'image': open(image_path, 'rb')}
-            data = {'predictions': json.dumps(predictions)}
+            # files = {'image': open(image_path, 'rb')}
+            # data = {'predictions': json.dumps(predictions)}
 
-            # Send POST request to the endpoint
-            response = requests.post(processing_endpoint, files=files, data=data)
+            # # Send POST request to the endpoint
+            # response = requests.post(processing_endpoint, files=files, data=data)
 
-            # Extract response data
-            response_data = response.json()
+            # # Extract response data
+            # response_data = response.json()
             
-            # Unload image
-            image_stage_2_base64 = response_data.get('image', '')
-            image_stage_2_path = f"{cropped_output_dir}/censored.jpg"
+            # # Unload image
+            # image_stage_2_base64 = response_data.get('image', '')
+            # image_stage_2_path = f"{cropped_output_dir}/censored.jpg"
 
-            # Decode base64 and save the image
-            image_data = base64.b64decode(image_stage_2_base64)
-            with open(image_stage_2_path, 'wb') as censored_image:
-                censored_image.write(image_data)
+            # # Decode base64 and save the image
+            # image_data = base64.b64decode(image_stage_2_base64)
+            # with open(image_stage_2_path, 'wb') as censored_image:
+            #     censored_image.write(image_data)
 
-            # Unload predictions
-            predictions = json.loads(response_data['predictions'])
+            # # Unload predictions
+            # predictions = json.loads(response_data['predictions'])
 
-            # Perform inference with custom model on censored images
-            result_custom = CLIENT.infer(image_stage_2_path, model_id="nanobrick/1")
-            predictions_custom = result_custom['predictions']
+            # # Perform inference with custom model on censored images
+            # result_custom = CLIENT.infer(image_stage_2_path, model_id="nanobrick/1")
+            # predictions_custom = result_custom['predictions']
 
-            # Iterate over censored predictions and save to dictionary
-            for prediction in predictions_custom:
-                predictions.append(bounding_box(prediction))
+            # # Iterate over censored predictions and save to dictionary
+            # for prediction in predictions_custom:
+            #     predictions.append(bounding_box(prediction))
 
-            # Remove overlaps in predictions
-            predictions = remove_overlaps(predictions)
+            # # Remove overlaps in predictions
+            # predictions = remove_overlaps(predictions)
 
             """
             Perform brick recognition
@@ -214,7 +214,8 @@ def predict():
                 cropped_image = cropped_image.convert("RGB")
 
                 # Pad images
-                padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
+                # padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
+                padded_image = pad_image(cropped_image, (255, 255, 255), 3)
                 padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
             # Query brickognize
