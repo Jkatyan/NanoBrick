@@ -17,7 +17,7 @@ Globals
 """
 
 # Object overlap threshold
-OVERLAP_THRESHOLD = 0.98
+OVERLAP_THRESHOLD = 0.9
 
 # Stage 2 processing endpoint
 processing_endpoint = "https://nanobrick-stage2.vercel.app/process"
