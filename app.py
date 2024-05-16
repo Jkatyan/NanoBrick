@@ -8,7 +8,7 @@ import json
 import requests
 import tempfile
 import base64
-from PIL import Image
+from PIL import Image, ImageDraw
 from flask import Flask, request, jsonify
 from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 
@@ -171,16 +171,48 @@ def predict():
             """
             Stage 2: Calculate average color, censor iteration 1 results, use custom model, remove overlaps
             """
+
+            image_copy = image.copy()
+
+            # Censor out predicted boxes
+            draw = ImageDraw.Draw(image_copy)
+            for prediction in predictions:
+                draw.rectangle(prediction['coordinates'], fill=(0, 255, 0))
+            image_copy = image_copy.convert("RGB")
+
+            # Calculate average background color
+            width, height = image_copy.size
+            total_red = 0
+            total_green = 0
+            total_blue = 0
+            num_valid_pixels = 0
             
-            # Prepare data for POST request
-            files = {'image': open(image_path, 'rb')}
-            data = {'predictions': json.dumps(predictions)}
+            for y in range(height):
+                for x in range(width):
+                    r, g, b = image_copy.getpixel((x, y))
+                    # Exclude pure green pixels
+                    if (r, g, b) != (0, 255, 0):
+                        total_red += r
+                        total_green += g
+                        total_blue += b
+                        num_valid_pixels += 1
+            
+            # Fill with average background color
+            avg_red = total_red / num_valid_pixels
+            avg_green = total_green / num_valid_pixels
+            avg_blue = total_blue / num_valid_pixels
 
-            # Send POST request to the endpoint
-            response = requests.post(processing_endpoint, files=files, data=data)
+            avg_color = (int(avg_red), int(avg_green), int(avg_blue))
+            
+            # # Prepare data for POST request
+            # files = {'image': open(image_path, 'rb')}
+            # data = {'predictions': json.dumps(predictions)}
 
-            # Extract response data
-            response_data = response.json()
+            # # Send POST request to the endpoint
+            # response = requests.post(processing_endpoint, files=files, data=data)
+
+            # # Extract response data
+            # response_data = response.json()
             
             # # Unload image
             # image_stage_2_base64 = response_data.get('image', '')
@@ -217,8 +249,8 @@ def predict():
                 cropped_image = cropped_image.convert("RGB")
 
                 # Pad images
-                padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
-                # padded_image = pad_image(cropped_image, (255, 255, 255), 3)
+                # padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
+                padded_image = pad_image(cropped_image, avg_color, 3)
                 padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
                 # cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
