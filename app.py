@@ -181,7 +181,7 @@ def predict():
             image_copy = image_copy.convert("RGB")
 
             # Define the step size
-            step_size = 50
+            step_size = 25
 
             # Calculate average background color
             width, height = image_copy.size
@@ -204,8 +204,14 @@ def predict():
             avg_red = total_red / num_valid_pixels
             avg_green = total_green / num_valid_pixels
             avg_blue = total_blue / num_valid_pixels
-
             avg_color = (int(avg_red), int(avg_green), int(avg_blue))
+
+            draw = ImageDraw.Draw(image_copy)
+            for prediction in predictions:
+                draw.rectangle(prediction['coordinates'], fill=avg_color)
+            image_copy = image_copy.convert("RGB")
+            image_copy_path = f"{cropped_output_dir}/censored.jpg"
+            image_copy.save(image_copy_path)
             
             # # Prepare data for POST request
             # files = {'image': open(image_path, 'rb')}
@@ -230,15 +236,15 @@ def predict():
             # predictions = json.loads(response_data['predictions'])
 
             # # Perform inference with custom model on censored images
-            # result_custom = CLIENT.infer(image_stage_2_path, model_id="nanobrick/1")
-            # predictions_custom = result_custom['predictions']
+            result_custom = CLIENT.infer(image_copy_path, model_id="nanobrick/1")
+            predictions_custom = result_custom['predictions']
 
-            # # Iterate over censored predictions and save to dictionary
-            # for prediction in predictions_custom:
-            #     predictions.append(bounding_box(prediction))
+            # Iterate over censored predictions and save to dictionary
+            for prediction in predictions_custom:
+                predictions.append(bounding_box(prediction))
 
-            # # Remove overlaps in predictions
-            # predictions = remove_overlaps(predictions)
+            # Remove overlaps in predictions
+            predictions = remove_overlaps(predictions)
 
             """
             Perform brick recognition
@@ -253,7 +259,7 @@ def predict():
 
                 # Pad images
                 # padded_image = pad_image(cropped_image, tuple(response_data['avg_color']), 3)
-                padded_image = pad_image(cropped_image, avg_color, 3)
+                padded_image = pad_image(cropped_image, avg_color, 2)
                 padded_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
                 # cropped_image.save(f"{cropped_output_dir}/{prediction['name']}.jpg")
             
