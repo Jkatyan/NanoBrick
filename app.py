@@ -181,7 +181,7 @@ def predict():
             image_copy = image_copy.convert("RGB")
 
             # Define the step size
-            step_size = 100
+            step_size = 200
 
             # Calculate average background color
             width, height = image_copy.size
