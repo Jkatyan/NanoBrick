@@ -180,15 +180,18 @@ def predict():
                 draw.rectangle(prediction['coordinates'], fill=(0, 255, 0))
             image_copy = image_copy.convert("RGB")
 
+            # Define the step size
+            step_size = 50
+
             # Calculate average background color
             width, height = image_copy.size
             total_red = 0
             total_green = 0
             total_blue = 0
             num_valid_pixels = 0
-            
-            for y in range(height):
-                for x in range(width):
+
+            for y in range(0, height, step_size):
+                for x in range(0, width, step_size):
                     r, g, b = image_copy.getpixel((x, y))
                     # Exclude pure green pixels
                     if (r, g, b) != (0, 255, 0):
@@ -196,7 +199,7 @@ def predict():
                         total_green += g
                         total_blue += b
                         num_valid_pixels += 1
-            
+
             # Fill with average background color
             avg_red = total_red / num_valid_pixels
             avg_green = total_green / num_valid_pixels
