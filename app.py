@@ -16,11 +16,27 @@ from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 Globals
 """
 
-# Classes
-classes = ['10928', '2465', '2780', '32009', '32014', '32034', '32054', '32062', '32072', '32073', '32140', '32184', '32248', '32270', '32271', '32291', '32348', '32449', '32498', '32523', '32526', '32556', '33299', '3647', '3648', '3649', '3673', '3706', '3713', '3737', '3749', '40490', '41239', '41678', '4185c01', '42003', '44809', '4519', '45590', '4716', '48989', '55615', '57585', '60483', '60484', '62462', '63869', '64178', '64179', '6536', '6538c', '6558', '6587', '6589', '6629', '81', '82', '83', '84', '85', '87083', '92911', '94925', '99010', '99773', 'x346']
+# Kit groups
+group_1 = ['32449', '33299', '41678', '99773', '87082', '48989', '55615']
+group_2 = ['6538c', '6536', '57585', '44809', '63869', '32291', '42003', '32184', '32014', '32013', '32034']
+group_3 = ['32523', '60483', '45590', 'x346']
+group_4 = ['32062', '4519', '3705', '32073', '3706', '44294', '3707', '60485', '3737', '3708']
+group_5 = ['6558', '32556']
+group_6 = ['2780', '3673']
+group_7 = ['32054', '62462', '87083', '55013', '6587']
+group_8 = ['3749', '43093']
+group_9 = ['4265c', '3713']
+group_10 = ['32316', '32524', '40490', '32525', '41239', '32278']
+group_11 = ['32140', '60484', '32526', '32348', '32271', '6629', '32009']
+group_12 = ['64179', '64178', '92911']
+group_13 = ['10928', '6589', '94925', '3648', '3649', '32270', '32269', '32498', '99010', '4716', '32072', '4185c01']
+
+# All classes
+groups = [group_1, group_2, group_3, group_4, group_5, group_6, group_7, group_8, group_9, group_10, group_11, group_12, group_13]
+classes = group_1 + group_2 + group_3 + group_4 + group_5 + group_6 + group_7 + group_8 + group_9 + group_10 + group_11 + group_12 + group_13
 
 # Object overlap threshold
-OVERLAP_THRESHOLD = 0.75
+OVERLAP_THRESHOLD = 0.7
 
 # Black object threshold
 BLACK_THRESHOLD = 0.05
@@ -288,6 +304,97 @@ def predict():
             
             # Query brickognize
             for cropped_root, _, cropped_files in os.walk(cropped_output_dir):
+
+                """
+                Query brickognize, determine correct kit group
+                """
+
+                initial_bricks = []
+                for cropped_file in cropped_files:
+                    try: 
+                        cropped_image_path = os.path.abspath(os.path.join(cropped_root, cropped_file))
+                        items = recognize(cropped_image_path)
+                        label = None
+
+                        # Get most likely item that's within the expected classes
+                        for item in items:
+                            if item["id"] in classes:
+                                label = item["id"]
+                                break
+
+                        if label is not None:
+                            if label == '43093' or label == '3749':
+                                image = cv2.imread(cropped_image_path)
+                                color = detect_color(image)
+                                if color == 'Yellow':
+                                    label = "3749"
+                                else:
+                                    label = "43093"
+
+                            # Add to initial bricks list
+                            initial_bricks.append(label)
+
+                    # Skip images with no result   
+                    except:
+                        continue
+
+                """
+                Determine correct group
+                """
+
+                count_1 = 0
+                count_2 = 0
+                count_3 = 0
+                count_4 = 0
+                count_5 = 0
+                count_6 = 0
+                count_7 = 0
+                count_8 = 0
+                count_9 = 0
+                count_10 = 0
+                count_11 = 0
+                count_12 = 0
+                count_13 = 0
+
+                for id in initial_bricks:
+                    if id in group_1:
+                        count_1 += 1
+                    elif id in group_2:
+                        count_2 += 1
+                    elif id in group_3:
+                        count_3 += 1
+                    elif id in group_4:
+                        count_4 += 1
+                    elif id in group_5:
+                        count_5 += 1
+                    elif id in group_6:
+                        count_6 += 1
+                    elif id in group_7:
+                        count_7 += 1
+                    elif id in group_8:
+                        count_8 += 1
+                    elif id in group_9:
+                        count_9 += 1
+                    elif id in group_10:
+                        count_10 += 1
+                    elif id in group_11:
+                        count_11 += 1
+                    elif id in group_12:
+                        count_12 += 1
+                    elif id in group_13:
+                        count_13 += 1
+                
+                counts = [count_1, count_2, count_3, count_4, count_5, count_6, count_7, count_8, count_9, count_10, count_11, count_12, count_13]
+                max_value = max(counts)
+                max_index = counts.index(max_value)
+
+                print("Selected group:", max_index + 1)
+                selected_kit = groups[max_index]                                    
+
+                """
+                Re-query brickognize with filtered list
+                """
+
                 for cropped_file in cropped_files:
                     try: 
                         cropped_image_path = os.path.abspath(os.path.join(cropped_root, cropped_file))
@@ -298,7 +405,7 @@ def predict():
 
                         # Get most likely item that's within the expected classes
                         for item in items:
-                            if item["id"] in classes:
+                            if item["id"] in selected_kit:
                                 label = item["id"]
                                 name = item["name"]
                                 img = item["img_url"]
@@ -334,7 +441,7 @@ def predict():
                 
 
     # Convert bricks dictionary to JSON format
-    json_data = [{"label": label, "name": data["name"], "count": data["count"], "image_url": data["image_url"]} for label, data in bricks.items()]
+    json_data = [{"label": label, "name": data["name"], "count": str(data["count"]), "image_url": data["image_url"]} for label, data in bricks.items()]
 
     # Print final prediction count for debug
     print("Final count:", len(predictions))
