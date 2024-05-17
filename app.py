@@ -47,7 +47,7 @@ OVERLAP_THRESHOLD_6 = 0.9
 OVERLAP_THRESHOLD_7 = 0.9
 OVERLAP_THRESHOLD_8 = 0.7
 OVERLAP_THRESHOLD_9 = 0.7
-OVERLAP_THRESHOLD_10 = 0.7
+OVERLAP_THRESHOLD_10 = 0.93
 OVERLAP_THRESHOLD_11 = 0.7
 OVERLAP_THRESHOLD_12 = 0.7
 OVERLAP_THRESHOLD_13 = 0.7
@@ -160,37 +160,22 @@ def pad_image(image, border_color, padding_factor):
 def detect_color(image):
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     
-    # Define ranges for each color in HSV
-    lower_red = np.array([0, 50, 50])
-    upper_red = np.array([20, 255, 255])
-    
-    lower_green = np.array([30, 30, 30])
-    upper_green = np.array([90, 255, 255])
-    
     lower_blue = np.array([70, 50, 50])
     upper_blue = np.array([170, 255, 255])
     
     lower_yellow = np.array([10, 50, 50])
     upper_yellow = np.array([40, 255, 255])
     
-    # Threshold the HSV image to get only the specified colors
-    mask_red = cv2.inRange(hsv, lower_red, upper_red)
-    mask_green = cv2.inRange(hsv, lower_green, upper_green)
     mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
     mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
     
     # Apply a mask to filter out low brightness pixels
     v_channel = hsv[:,:,2]
-    min_brightness = 20
-    min_brightness_blue = 150
-    mask_red[v_channel < min_brightness] = 0
-    mask_green[v_channel < min_brightness] = 0
-    mask_blue[v_channel < min_brightness_blue] = 0
+    min_brightness = 100
+    mask_blue[v_channel < min_brightness] = 0
     mask_yellow[v_channel < min_brightness] = 0
     
     # Count the number of pixels for each color
-    count_red = cv2.countNonZero(mask_red)
-    count_green = cv2.countNonZero(mask_green)
     count_blue = cv2.countNonZero(mask_blue)
     count_yellow = cv2.countNonZero(mask_yellow)
 
@@ -199,7 +184,7 @@ def detect_color(image):
     count_total = img_height * img_width
 
     # Determine the dominant color
-    color_counts = {'Red': count_red, 'Green': count_green, 'Blue': count_blue, 'Yellow': count_yellow}
+    color_counts = {'Blue': count_blue, 'Yellow': count_yellow}
     dominant_color = max(color_counts, key=color_counts.get)
 
     # Check if image is black
