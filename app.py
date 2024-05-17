@@ -38,13 +38,13 @@ classes = group_1 + group_2 + group_3 + group_4 + group_5 + group_6 + group_7 + 
 
 # Object overlap threshold
 DEFAULT_OVERLAP_THRESHOLD = 0.7
-OVERLAP_THRESHOLD_1 = 0.7
+OVERLAP_THRESHOLD_1 = 0.75
 OVERLAP_THRESHOLD_2 = 0.85
 OVERLAP_THRESHOLD_3 = 0.6
-OVERLAP_THRESHOLD_4 = 0.7
+OVERLAP_THRESHOLD_4 = 0.98
 OVERLAP_THRESHOLD_5 = 0.7
 OVERLAP_THRESHOLD_6 = 0.9
-OVERLAP_THRESHOLD_7 = 0.7
+OVERLAP_THRESHOLD_7 = 0.9
 OVERLAP_THRESHOLD_8 = 0.7
 OVERLAP_THRESHOLD_9 = 0.7
 OVERLAP_THRESHOLD_10 = 0.7
@@ -167,8 +167,8 @@ def detect_color(image):
     lower_green = np.array([30, 30, 30])
     upper_green = np.array([90, 255, 255])
     
-    lower_blue = np.array([80, 50, 50])
-    upper_blue = np.array([150, 255, 255])
+    lower_blue = np.array([70, 50, 50])
+    upper_blue = np.array([170, 255, 255])
     
     lower_yellow = np.array([10, 50, 50])
     upper_yellow = np.array([40, 255, 255])
@@ -181,10 +181,11 @@ def detect_color(image):
     
     # Apply a mask to filter out low brightness pixels
     v_channel = hsv[:,:,2]
-    min_brightness = 75
+    min_brightness = 20
+    min_brightness_blue = 150
     mask_red[v_channel < min_brightness] = 0
     mask_green[v_channel < min_brightness] = 0
-    mask_blue[v_channel < min_brightness] = 0
+    mask_blue[v_channel < min_brightness_blue] = 0
     mask_yellow[v_channel < min_brightness] = 0
     
     # Count the number of pixels for each color
@@ -221,6 +222,10 @@ def predict():
             image_file.save(temp_image.name)
             image_path = temp_image.name
             image = Image.open(image_path)
+
+            info = f"Starting Prediction, ID: {temp_image.name}"
+            print('=' * len(info))
+            print(f"{info}")
 
             # Perform inference with custom model
             result_custom = CLIENT.infer(image_path, model_id="nanobrick/1")
@@ -388,8 +393,7 @@ def predict():
                     overlap_threshold = overlap_thresholds[max_index]   
 
                     print("Selected group:", max_index + 1)
-                    print("Overlap threshold:", overlap_threshold)                              
-
+                    print("Overlap threshold:", overlap_threshold)
 
             """
             Redo predictions with correct overlap threshold and group
@@ -489,6 +493,8 @@ def predict():
                     Query brickognize
                     """
 
+                    total = 0
+
                     for cropped_file in cropped_files:
                         try: 
                             cropped_image_path = os.path.abspath(os.path.join(cropped_root, cropped_file))
@@ -512,14 +518,20 @@ def predict():
                                     color = detect_color(image)
                                     if color == 'Yellow':
                                         label = "3749"
+                                        name = "Technic, Axle 1L with Pin without Friction Ridges"
+                                        img = "https://storage.googleapis.com/brickognize-static/thumbnails-v2.4/part/3749/0.webp"
                                     else:
                                         label = "43093"
+                                        name = "Technic, Axle 1L with Pin with Friction Ridges"
+                                        img = "https://storage.googleapis.com/brickognize-static/thumbnails-v2.4/part/43093/0.webp"
 
                                 # Add to json
                                 if label in bricks:
                                     bricks[label]["count"] += 1
                                 else:
                                     bricks[label] = {"count": 1, "name": name, "image_url": img}
+
+                                total += 1
 
                         # Skip images with no result   
                         except:
@@ -530,7 +542,8 @@ def predict():
         json_data = [{"label": label, "name": data["name"], "count": str(data["count"]), "image_url": data["image_url"]} for label, data in bricks.items()]
 
         # Print final prediction count for debug
-        print("Final count:", len(predictions))
+        print("Final count:", total)
+        print('=' * len(info))
 
         return jsonify(json_data)
 
